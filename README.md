@@ -174,7 +174,10 @@ PowerShell:
 La biblioteca busca ROMs en la carpeta `roms\` situada junto al ejecutable.
 Con la compilación directa o con `build.ps1`, eso significa `output\roms\`.
 También puedes abrir una ROM con el botón **Abrir ROM**, arrastrarla sobre la
-ventana o indicarla por línea de comandos:
+ventana o indicarla por línea de comandos. Al iniciar un juego, la biblioteca
+permanece en la ventana principal y la partida se muestra en una ventana
+independiente que puedes redimensionar; usa **F11** para poner el juego en
+pantalla completa y **F1** para volver a la biblioteca.
 
 ```powershell
 .\output\classicboy.exe --rom "output\roms\juego.gbc"

@@ -110,7 +110,8 @@ static void draw_sidebar(App *app)
             ui_round_rect_outline(ui, game_panel, 12, UI_ACCENT_DIM, 1);
             ui->want_hand = true;
             if (ui->mouse_pressed) {
-                app->page = APP_PAGE_GAME;
+                app->page = app_open_game_window(app) ? APP_PAGE_LIBRARY
+                                                      : APP_PAGE_GAME;
             }
         }
     } else {
@@ -278,7 +279,8 @@ static void draw_library_page(App *app)
         }
         if (draw_library_card(app, card, &app->roms.items[i], i)) {
             if (app_load_rom(app, app->roms.items[i].path)) {
-                app->page = APP_PAGE_GAME;
+                app->page = app_open_game_window(app) ? APP_PAGE_LIBRARY
+                                                      : APP_PAGE_GAME;
             }
         }
     }

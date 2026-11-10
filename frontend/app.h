@@ -38,6 +38,11 @@ typedef struct App {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *screen_texture;
+    SDL_Window *game_window;
+    SDL_Renderer *game_renderer;
+    SDL_Texture *game_texture;
+    bool game_window_open;
+    bool game_fullscreen;
     bool vsync;
     Ui ui;
 
@@ -98,6 +103,7 @@ bool app_load_rom(App *app, const char *path);
 void app_reset(App *app);
 void app_refresh_library(App *app);
 void app_open_dialog(App *app);
+bool app_open_game_window(App *app);
 void app_open_roms_folder(App *app);
 void app_toggle_pause(App *app);
 void app_take_screenshot(App *app);

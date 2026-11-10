@@ -600,7 +600,23 @@ static GbButton button_for_controller(Uint8 button)
 
 static void toggle_fullscreen(App *app)
 {
-    if (!app || !app->window) {
+    if (!app) {
+        return;
+    }
+    if (app->game_window_open && app->game_window) {
+        bool target = !app->game_fullscreen;
+        if (SDL_SetWindowFullscreen(
+                app->game_window,
+                target ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0) != 0) {
+            app_toast(app, "No se pudo cambiar el juego a pantalla completa");
+            return;
+        }
+        app->game_fullscreen = target;
+        app->last_tick = SDL_GetPerformanceCounter();
+        app->frame_accumulator = 0.0;
+        return;
+    }
+    if (!app->window) {
         return;
     }
     bool target = !app->fullscreen;
@@ -639,7 +655,7 @@ static void handle_key(App *app, SDL_Keycode key, bool pressed)
             return;
         case SDLK_ESCAPE:
         case SDLK_p:
-            if (app->rom_loaded && app->page == APP_PAGE_GAME) {
+            if (app->rom_loaded) {
                 app_toggle_pause(app);
             }
             return;
@@ -677,7 +693,7 @@ static void handle_key(App *app, SDL_Keycode key, bool pressed)
         set_input(app, app->key_buttons, button, false);
         return;
     }
-    if (!app->rom_loaded || app->page != APP_PAGE_GAME || app->paused) {
+    if (!app->rom_loaded || app->paused) {
         return;
     }
     set_input(app, app->key_buttons, button, true);
@@ -696,7 +712,7 @@ static void handle_controller_button(App *app, Uint8 button, bool pressed)
         set_input(app, app->pad_buttons, target, false);
         return;
     }
-    if (!app->rom_loaded || app->page != APP_PAGE_GAME || app->paused) {
+    if (!app->rom_loaded || app->paused) {
         return;
     }
     set_input(app, app->pad_buttons, target, true);
@@ -778,7 +794,8 @@ static void open_rom_dialog(App *app)
         char utf8[32768];
         if (wide_to_utf8(file, utf8, (int)sizeof(utf8))) {
             if (app_load_rom(app, utf8)) {
-                app->page = APP_PAGE_GAME;
+                app->page = app_open_game_window(app) ? APP_PAGE_LIBRARY
+                                                      : APP_PAGE_GAME;
             }
         }
     }
@@ -826,7 +843,7 @@ static void run_emulated_frame(App *app)
 
 static void update_screen_texture(App *app)
 {
-    if (!app || !app->screen_texture) {
+    if (!app || (!app->screen_texture && !app->game_texture)) {
         return;
     }
     const uint16_t *framebuffer = gb_framebuffer(&app->gb);
@@ -836,8 +853,119 @@ static void update_screen_texture(App *app)
     for (size_t i = 0; i < GB_SCREEN_W * GB_SCREEN_H; i++) {
         app->screen_pixels[i] = gb_rgb555_to_argb(framebuffer[i]);
     }
-    SDL_UpdateTexture(app->screen_texture, NULL, app->screen_pixels,
-                      GB_SCREEN_W * (int)sizeof(uint32_t));
+    if (app->screen_texture) {
+        SDL_UpdateTexture(app->screen_texture, NULL, app->screen_pixels,
+                          GB_SCREEN_W * (int)sizeof(uint32_t));
+    }
+    if (app->game_texture) {
+        SDL_UpdateTexture(app->game_texture, NULL, app->screen_pixels,
+                          GB_SCREEN_W * (int)sizeof(uint32_t));
+    }
+}
+
+bool app_open_game_window(App *app)
+{
+    if (!app || !app->rom_loaded) {
+        return false;
+    }
+    if (app->game_window) {
+        char title[128];
+        snprintf(title, sizeof(title), "%s - ClassicBoy", app->rom_title);
+        SDL_SetWindowTitle(app->game_window, title);
+        SDL_ShowWindow(app->game_window);
+        SDL_RaiseWindow(app->game_window);
+        app->game_window_open = true;
+        return true;
+    }
+
+    char title[128];
+    snprintf(title, sizeof(title), "%s - ClassicBoy", app->rom_title);
+    app->game_window = SDL_CreateWindow(
+        title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 720,
+        SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    if (!app->game_window) {
+        char message[256];
+        snprintf(message, sizeof(message),
+                 "No se pudo crear la ventana del juego: %s", SDL_GetError());
+        app_toast(app, "%s", message);
+        return false;
+    }
+    SDL_SetWindowMinimumSize(app->game_window, 320, 288);
+
+    app->game_renderer =
+        SDL_CreateRenderer(app->game_window, -1, SDL_RENDERER_ACCELERATED);
+    if (!app->game_renderer) {
+        app->game_renderer =
+            SDL_CreateRenderer(app->game_window, -1, SDL_RENDERER_SOFTWARE);
+    }
+    if (!app->game_renderer) {
+        char message[256];
+        snprintf(message, sizeof(message),
+                 "No se pudo crear el renderizador del juego: %s",
+                 SDL_GetError());
+        SDL_DestroyWindow(app->game_window);
+        app->game_window = NULL;
+        app_toast(app, "%s", message);
+        return false;
+    }
+
+    app->game_texture = SDL_CreateTexture(
+        app->game_renderer, SDL_PIXELFORMAT_ARGB8888,
+        SDL_TEXTUREACCESS_STREAMING, GB_SCREEN_W, GB_SCREEN_H);
+    if (!app->game_texture) {
+        char message[256];
+        snprintf(message, sizeof(message),
+                 "No se pudo crear la pantalla del juego: %s", SDL_GetError());
+        SDL_DestroyRenderer(app->game_renderer);
+        SDL_DestroyWindow(app->game_window);
+        app->game_renderer = NULL;
+        app->game_window = NULL;
+        app_toast(app, "%s", message);
+        return false;
+    }
+    SDL_SetTextureBlendMode(app->game_texture, SDL_BLENDMODE_NONE);
+    SDL_SetTextureScaleMode(app->game_texture, SDL_ScaleModeNearest);
+    SDL_SetRenderDrawColor(app->game_renderer, 0, 0, 0, 255);
+    update_screen_texture(app);
+    SDL_ShowWindow(app->game_window);
+    SDL_RaiseWindow(app->game_window);
+    app->game_window_open = true;
+    return true;
+}
+
+static void render_game_window(App *app)
+{
+    if (!app || !app->game_window_open || !app->game_renderer ||
+        !app->game_texture) {
+        return;
+    }
+    int output_w = 0;
+    int output_h = 0;
+    if (SDL_GetRendererOutputSize(app->game_renderer, &output_w, &output_h) !=
+            0 ||
+        output_w <= 0 || output_h <= 0) {
+        return;
+    }
+    double scale = fmin((double)output_w / GB_SCREEN_W,
+                        (double)output_h / GB_SCREEN_H);
+    int screen_w;
+    int screen_h;
+    if (app->config.integer_scale) {
+        int integer_scale = (int)floor(scale);
+        if (integer_scale < 1) {
+            integer_scale = 1;
+        }
+        screen_w = GB_SCREEN_W * integer_scale;
+        screen_h = GB_SCREEN_H * integer_scale;
+    } else {
+        screen_w = (int)floor(GB_SCREEN_W * scale);
+        screen_h = (int)floor(GB_SCREEN_H * scale);
+    }
+    SDL_Rect destination = {(output_w - screen_w) / 2,
+                           (output_h - screen_h) / 2, screen_w, screen_h};
+    SDL_RenderClear(app->game_renderer);
+    SDL_RenderCopy(app->game_renderer, app->game_texture, NULL, &destination);
+    SDL_RenderPresent(app->game_renderer);
 }
 
 /* ------------------------------------------------------------------ */
@@ -861,24 +989,29 @@ static void process_events(App *app)
             handle_key(app, event.key.keysym.sym, false);
             break;
         case SDL_MOUSEMOTION:
-            update_mouse(app, event.motion.x, event.motion.y);
+            if (event.motion.windowID == SDL_GetWindowID(app->window)) {
+                update_mouse(app, event.motion.x, event.motion.y);
+            }
             break;
         case SDL_MOUSEBUTTONDOWN:
-            if (event.button.button == SDL_BUTTON_LEFT) {
+            if (event.button.windowID == SDL_GetWindowID(app->window) &&
+                event.button.button == SDL_BUTTON_LEFT) {
                 update_mouse(app, event.button.x, event.button.y);
                 app->ui.mouse_down = true;
                 app->ui.mouse_pressed = true;
             }
             break;
         case SDL_MOUSEBUTTONUP:
-            if (event.button.button == SDL_BUTTON_LEFT) {
+            if (event.button.windowID == SDL_GetWindowID(app->window) &&
+                event.button.button == SDL_BUTTON_LEFT) {
                 update_mouse(app, event.button.x, event.button.y);
                 app->ui.mouse_down = false;
                 app->ui.mouse_released = true;
             }
             break;
         case SDL_MOUSEWHEEL:
-            if (app->page == APP_PAGE_LIBRARY) {
+            if (event.wheel.windowID == SDL_GetWindowID(app->window) &&
+                app->page == APP_PAGE_LIBRARY) {
                 app->library_scroll -= event.wheel.y * 72;
                 if (app->library_scroll < 0) {
                     app->library_scroll = 0;
@@ -886,6 +1019,22 @@ static void process_events(App *app)
             }
             break;
         case SDL_WINDOWEVENT:
+            if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
+                if (app->game_window &&
+                    event.window.windowID == SDL_GetWindowID(app->game_window)) {
+                    if (app->game_fullscreen) {
+                        SDL_SetWindowFullscreen(app->game_window, 0);
+                        app->game_fullscreen = false;
+                    }
+                    SDL_HideWindow(app->game_window);
+                    app->game_window_open = false;
+                    release_all_inputs(app);
+                } else if (event.window.windowID ==
+                           SDL_GetWindowID(app->window)) {
+                    app->should_quit = true;
+                }
+                break;
+            }
             if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                 release_all_inputs(app);
                 app->fast_forward = false;
@@ -900,7 +1049,8 @@ static void process_events(App *app)
         case SDL_DROPFILE:
             if (event.drop.file) {
                 if (app_load_rom(app, event.drop.file)) {
-                    app->page = APP_PAGE_GAME;
+                    app->page = app_open_game_window(app) ? APP_PAGE_LIBRARY
+                                                          : APP_PAGE_GAME;
                 }
                 SDL_free(event.drop.file);
             }
@@ -1256,6 +1406,18 @@ static void shutdown_app(App *app)
     if (app->rom_loaded) {
         gb_save_battery(&app->gb);
     }
+    if (app->game_texture) {
+        SDL_DestroyTexture(app->game_texture);
+        app->game_texture = NULL;
+    }
+    if (app->game_renderer) {
+        SDL_DestroyRenderer(app->game_renderer);
+        app->game_renderer = NULL;
+    }
+    if (app->game_window) {
+        SDL_DestroyWindow(app->game_window);
+        app->game_window = NULL;
+    }
     if (app->window && !app->fullscreen) {
         int width = 0;
         int height = 0;
@@ -1372,6 +1534,15 @@ int main(int argc, char **argv)
         shutdown_app(&app);
         return result;
     }
+    if (app.rom_loaded && (options.rom_path || app.page == APP_PAGE_GAME)) {
+        if (app_open_game_window(&app)) {
+            if (app.page == APP_PAGE_GAME) {
+                app.page = APP_PAGE_LIBRARY;
+            }
+        } else if (options.rom_path) {
+            app.page = APP_PAGE_GAME;
+        }
+    }
 
     uint64_t next_present = SDL_GetPerformanceCounter();
     while (!app.should_quit && !g_interrupted) {
@@ -1416,6 +1587,7 @@ int main(int argc, char **argv)
         SDL_RenderClear(app.renderer);
         pages_draw(&app);
         SDL_RenderPresent(app.renderer);
+        render_game_window(&app);
 
         if (app.open_dialog_requested) {
             app.open_dialog_requested = false;
