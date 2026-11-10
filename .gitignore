@@ -1,0 +1,13 @@
+# Artefactos de compilacion
+build/
+build-cmake/
+*.o
+*.exe
+
+# Salida generada por la compilacion y en tiempo de ejecucion
+output/classicboy.exe
+output/SDL2.dll
+output/assets/
+output/screenshots/
+output/roms/
+output/classicboy.cfg
