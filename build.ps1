@@ -96,8 +96,20 @@ function Invoke-Gcc {
 
 if ($Target -eq "all" -or $Target -eq "app") {
     Write-Host "Compilando ClassicBoy..."
+    if (-not (Get-Command windres.exe -ErrorAction SilentlyContinue)) {
+        throw "No se encontro windres.exe. Instala MinGW-w64 y anade su carpeta bin al PATH."
+    }
+
+    $IconObject = (Join-Path $BuildDir "classicboy_icon.o").Replace('\', '/')
+    & windres.exe "--include-dir=assets" "--output-format=coff" `
+        "assets/classicboy.rc" $IconObject
+    if ($LASTEXITCODE -ne 0) {
+        throw "windres fallo con el codigo de salida $LASTEXITCODE."
+    }
+
     $AppExe = (Join-Path $OutDir "classicboy.exe").Replace('\', '/')
     $AppArgs = $Cflags + $FrontendSources + $CoreSources + @(
+        $IconObject,
         "-o", $AppExe,
         "-L$SdlGcc/lib",
         "-lmingw32",

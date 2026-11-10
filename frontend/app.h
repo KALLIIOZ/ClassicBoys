@@ -12,7 +12,7 @@
 #include "roms.h"
 #include "ui.h"
 
-#define APP_VERSION "2.0.0"
+#define APP_VERSION "2.2.0"
 #define APP_PALETTE_COUNT 4
 
 typedef enum AppPage {

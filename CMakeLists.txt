@@ -28,6 +28,11 @@ find_package(SDL2 CONFIG REQUIRED)
 # ---------------------------------------------------------------------------
 # Fuentes
 # ---------------------------------------------------------------------------
+if(WIN32)
+    enable_language(RC)
+    set(CB_WINDOWS_RESOURCES assets/classicboy.rc)
+endif()
+
 set(CB_CORE_SOURCES
     src/apu.c
     src/cart.c
@@ -66,7 +71,11 @@ set(CB_TEST_SOURCES
 # Aplicacion
 # ---------------------------------------------------------------------------
 if(WIN32)
-    add_executable(classicboy WIN32 ${CB_CORE_SOURCES} ${CB_FRONTEND_SOURCES})
+    add_executable(classicboy WIN32
+        ${CB_CORE_SOURCES}
+        ${CB_FRONTEND_SOURCES}
+        ${CB_WINDOWS_RESOURCES}
+    )
 else()
     add_executable(classicboy ${CB_CORE_SOURCES} ${CB_FRONTEND_SOURCES})
 endif()
@@ -76,6 +85,11 @@ target_include_directories(classicboy PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/frontend"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb"
 )
+if(WIN32)
+    target_include_directories(classicboy PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    )
+endif()
 
 target_link_libraries(classicboy PRIVATE SDL2::SDL2main SDL2::SDL2)
 if(NOT WIN32)
