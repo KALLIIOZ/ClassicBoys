@@ -67,6 +67,7 @@ typedef struct Ui {
     bool mouse_down;
     bool mouse_pressed;
     bool mouse_released;
+    bool mouse_right_pressed;
     bool want_hand;
     bool hand_active;
     SDL_Cursor *hand_cursor;

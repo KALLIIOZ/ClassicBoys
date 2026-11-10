@@ -424,6 +424,46 @@ void app_toggle_pause(App *app)
     app_toast(app, app->paused ? "Juego en pausa" : "Continuando");
 }
 
+static void release_all_inputs(App *app);
+
+void app_stop_game(App *app)
+{
+    if (!app || !app->rom_loaded) {
+        return;
+    }
+
+    bool saved = gb_save_battery(&app->gb);
+    gb_destroy(&app->gb);
+    gb_init(&app->gb);
+    app->rom_loaded = false;
+    app->paused = false;
+    app->fast_forward = false;
+    app->now_menu_open = false;
+    app->rom_path[0] = '\0';
+    app->rom_title[0] = '\0';
+    app->rom_mbc[0] = '\0';
+    app->rom_size = 0;
+    app->rom_battery = false;
+    app->config.last_rom[0] = '\0';
+    app->frame_accumulator = 0.0;
+    app->fps = 0.0;
+    app->fps_frames = 0;
+    app->last_tick = SDL_GetPerformanceCounter();
+    app->page = APP_PAGE_LIBRARY;
+    release_all_inputs(app);
+    if (app->audio_ok) {
+        SDL_ClearQueuedAudio(app->audio_device);
+        SDL_PauseAudioDevice(app->audio_device, 1);
+    }
+    if (app->game_window) {
+        SDL_HideWindow(app->game_window);
+        app->game_window_open = false;
+    }
+    app_save_config(app);
+    app_toast(app, saved ? "Juego detenido"
+                         : "Juego detenido, pero no se pudo guardar el progreso");
+}
+
 void app_take_screenshot(App *app)
 {
     if (!app || !app->rom_loaded) {
@@ -999,6 +1039,10 @@ static void process_events(App *app)
                 update_mouse(app, event.button.x, event.button.y);
                 app->ui.mouse_down = true;
                 app->ui.mouse_pressed = true;
+            } else if (event.button.windowID == SDL_GetWindowID(app->window) &&
+                       event.button.button == SDL_BUTTON_RIGHT) {
+                update_mouse(app, event.button.x, event.button.y);
+                app->ui.mouse_right_pressed = true;
             }
             break;
         case SDL_MOUSEBUTTONUP:

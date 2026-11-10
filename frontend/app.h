@@ -56,6 +56,7 @@ typedef struct App {
     bool fast_forward;
     bool fullscreen;
     bool should_quit;
+    bool now_menu_open;
     char rom_path[CB_PATH_MAX];
     char rom_title[64];
     char rom_mbc[64];
@@ -106,6 +107,7 @@ void app_open_dialog(App *app);
 bool app_open_game_window(App *app);
 void app_open_roms_folder(App *app);
 void app_toggle_pause(App *app);
+void app_stop_game(App *app);
 void app_take_screenshot(App *app);
 void app_save_game(App *app);
 void app_save_config(App *app);

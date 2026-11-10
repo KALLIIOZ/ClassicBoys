@@ -83,6 +83,7 @@ void ui_end(Ui *ui)
     }
     ui->mouse_pressed = false;
     ui->mouse_released = false;
+    ui->mouse_right_pressed = false;
 }
 
 bool ui_init(Ui *ui, SDL_Renderer *renderer, const char *asset_dir)

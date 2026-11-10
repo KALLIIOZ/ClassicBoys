@@ -57,6 +57,42 @@ static void draw_logo(App *app, int x, int y, int size)
     ui_text_centered(ui, &ui->bold, "CB", text_area, UI_ACCENT_TEXT);
 }
 
+static void draw_now_game_menu(App *app)
+{
+    Ui *ui = &app->ui;
+    SDL_Rect panel = {20, 504, 208, 146};
+    bool hover = ui_hovered(ui, panel);
+
+    if (ui->mouse_right_pressed) {
+        app->now_menu_open =
+            app->rom_loaded && ui_hovered(ui, (SDL_Rect){16, 392, 216, 104});
+    } else if (app->now_menu_open && ui->mouse_pressed && !hover) {
+        app->now_menu_open = false;
+    }
+    if (!app->rom_loaded) {
+        app->now_menu_open = false;
+    }
+    if (!app->now_menu_open) {
+        return;
+    }
+
+    ui_round_rect(ui, panel, 10, UI_PANEL);
+    ui_round_rect_outline(ui, panel, 10, UI_BORDER, 1);
+    SDL_Rect pause = {panel.x + 8, panel.y + 8, panel.w - 16, 38};
+    SDL_Rect restart = {panel.x + 8, panel.y + 52, panel.w - 16, 38};
+    SDL_Rect stop = {panel.x + 8, panel.y + 96, panel.w - 16, 38};
+    if (ui_button(ui, pause, app->paused ? "Reanudar" : "Pausar", false,
+                  true)) {
+        app_toggle_pause(app);
+        app->now_menu_open = false;
+    } else if (ui_button(ui, restart, "Reiniciar", false, true)) {
+        app_reset(app);
+        app->now_menu_open = false;
+    } else if (ui_button(ui, stop, "Detener juego", false, true)) {
+        app_stop_game(app);
+    }
+}
+
 static void draw_sidebar(App *app)
 {
     Ui *ui = &app->ui;
@@ -132,6 +168,7 @@ static void draw_sidebar(App *app)
         snprintf(fps, sizeof(fps), "%.0f FPS", app->fps);
         ui_text_right(ui, &ui->small, fps, 228, bottom - 44, UI_TEXT_FAINT);
     }
+    draw_now_game_menu(app);
     ui_circle(ui, 26, bottom - 66, 4,
               app->audio_ok ? UI_ACCENT : UI_DANGER);
     ui_text(ui, &ui->small, app->audio_ok ? "Audio activo" : "Sin audio", 38,
