@@ -1,6 +1,6 @@
 # ClassicBoys 🎮
 
-**ClassicBoys** es un emulador ligero y modular de Nintendo Game Boy (DMG/CGB) escrito en **C / C++** utilizando **CMake** como sistema de construcción y la librería **SDL2** para la renderización de video, procesamiento de audio e interfaz de usuario.
+**ClassicBoys** es un emulador ligero y modular de Nintendo Game Boy (DMG/CGB) escrito en **C** utilizando **CMake** como sistema de construcción y la librería **SDL2** para la renderización de video, procesamiento de audio e interfaz de usuario.
 
 El proyecto está diseñado enfocado en la precisión de emulación a bajo nivel, modularidad del código fuente y facilidad de compilación multiplataforma.
 
